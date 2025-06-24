@@ -240,7 +240,7 @@ export default function FireplexityPage() {
             className="font-medium flex items-center gap-2"
           >
             <a 
-              href="https://github.com/j-mendez/firecrawl-search-rag" 
+              href="https://github.com/mendableai/fireplexity" 
               target="_blank" 
               rel="noopener noreferrer"
             >
