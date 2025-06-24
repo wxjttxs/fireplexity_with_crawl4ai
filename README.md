@@ -7,7 +7,7 @@ A blazing-fast AI search engine powered by Firecrawl's web scraping API. Get int
 ## Features
 
 - **Real-time Web Search** - Powered by Firecrawl's search API
-- **AI Responses** - Streaming answers with GPT-4
+- **AI Responses** - Streaming answers with GPT-4o
 - **Source Citations** - Every claim backed by references
 - **Live Stock Data** - Automatic TradingView charts
 - **Smart Follow-ups** - AI-generated questions
