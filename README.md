@@ -1,15 +1,17 @@
+<div align="center">
+
 # Fireplexity
 
 A blazing-fast AI search engine powered by Firecrawl's web scraping API. Get intelligent answers with real-time citations and live data.
 
-## Demo
+<img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjBxbWFxamZycWRkMmVhMGFiZnNuZjMxc3lpNHpuamR4OWlwa3F4NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QbfaTCB1OmkRmIQwzJ/giphy.gif" width="100%" alt="Fireplexity Demo" />
 
-![Fireplexity Demo](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjBxbWFxamZycWRkMmVhMGFiZnNuZjMxc3lpNHpuamR4OWlwa3F4NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QbfaTCB1OmkRmIQwzJ/giphy.gif)
+</div>
 
 ## Features
 
 - **Real-time Web Search** - Powered by Firecrawl's search API
-- **AI Responses** - Streaming answers with GPT-4o
+- **AI Responses** - Streaming answers with GPT-4o-mini
 - **Source Citations** - Every claim backed by references
 - **Live Stock Data** - Automatic TradingView charts
 - **Smart Follow-ups** - AI-generated questions
@@ -45,7 +47,7 @@ Visit http://localhost:3000
 
 - **Firecrawl** - Web scraping API
 - **Next.js 15** - React framework
-- **OpenAI** - GPT-4
+- **OpenAI** - GPT-4o-mini
 - **Vercel AI SDK** - Streaming
 - **TradingView** - Stock charts
 
