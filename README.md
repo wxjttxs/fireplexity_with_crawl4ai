@@ -4,6 +4,8 @@ A blazing-fast AI search engine powered by Firecrawl's web scraping API. Get int
 
 ## Demo
 
+![Fireplexity Demo](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjBxbWFxamZycWRkMmVhMGFiZnNuZjMxc3lpNHpuamR4OWlwa3F4NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QbfaTCB1OmkRmIQwzJ/giphy.gif)
+
 ## Features
 
 - **Real-time Web Search** - Powered by Firecrawl's search API
