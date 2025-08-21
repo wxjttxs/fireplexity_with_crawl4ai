@@ -149,7 +149,6 @@ export async function POST(request: Request) {
 
           // Transform news results - now with correct schema
           newsResults = newsData.map((item: any) => {
-            console.log(`[${requestId}] News item:`, JSON.stringify(item, null, 2));
             return {
               url: item.url,
               title: item.title,

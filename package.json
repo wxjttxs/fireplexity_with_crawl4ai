@@ -25,6 +25,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "shiki": "^3.11.0",
     "sonner": "^1.7.2",
     "streamdown": "^1.0.11",
     "tailwind-merge": "^3.3.0",
