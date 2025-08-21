@@ -7,7 +7,6 @@ import { selectRelevantContent } from '@/lib/content-selection'
 
 export async function POST(request: Request) {
   const requestId = Math.random().toString(36).substring(7)
-  console.log(`[${requestId}] Fireplexity Search API called`)
   
   try {
     const body = await request.json()
@@ -26,7 +25,6 @@ export async function POST(request: Request) {
         query = lastMessage.content
       }
     }
-    console.log(`[${requestId}] Query received:`, query)
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
@@ -130,16 +128,6 @@ export async function POST(request: Request) {
           const searchResult = await searchResponse.json()
           const searchData = searchResult.data || {}
           
-          console.log(`[${requestId}] Search API response structure:`, {
-            hasWeb: !!searchData.web,
-            webCount: searchData.web?.length || 0,
-            hasNews: !!searchData.news,
-            newsCount: searchData.news?.length || 0,
-            hasImages: !!searchData.images,
-            imagesCount: searchData.images?.length || 0,
-            keys: Object.keys(searchData)
-          })
-          
           // Extract results from the v2 SDK response
           const webResults = searchData.web || []
           const newsData = searchData.news || []
@@ -147,10 +135,6 @@ export async function POST(request: Request) {
           
           // Transform web sources metadata
           sources = webResults.map((item: any) => {
-            // Log first item to see structure
-            if (webResults.indexOf(item) === 0) {
-              console.log(`[${requestId}] First web result structure:`, JSON.stringify(item, null, 2));
-            }
             return {
               url: item.url,
               title: item.title || item.url,
@@ -178,10 +162,8 @@ export async function POST(request: Request) {
 
           // Transform image results - now with correct schema from direct API
           imageResults = imagesData.map((item: any) => {
-            console.log(`[${requestId}] Image item:`, JSON.stringify(item, null, 2));
             // Verify we have the required fields
             if (!item.url || !item.imageUrl) {
-              console.warn(`[${requestId}] Skipping image item missing url or imageUrl:`, item);
               return null;
             }
             return {
@@ -219,7 +201,6 @@ export async function POST(request: Request) {
           
           // Detect if query is about a company
           const ticker = detectCompanyTicker(query)
-          console.log(`[${requestId}] Query: "${query}" -> Detected ticker: ${ticker}`)
           if (ticker) {
             writer.write({
               type: 'data-ticker',
@@ -237,8 +218,6 @@ export async function POST(request: Request) {
             })
             .join('\n\n---\n\n')
 
-          console.log(`[${requestId}] Creating text stream for query:`, query)
-          console.log(`[${requestId}] Context length:`, context.length)
           
           // Prepare messages for the AI
           let aiMessages: ModelMessage[] = []
@@ -304,8 +283,6 @@ export async function POST(request: Request) {
             ]
           }
           
-          console.log(`[${requestId}] Creating text stream for query:`, query)
-          
           // Stream the text generation using Groq's Kimi K2 Instruct model
           const result = streamText({
             model: groq('moonshotai/kimi-k2-instruct'),
@@ -363,11 +340,10 @@ export async function POST(request: Request) {
               data: { questions: followUpQuestions }
             })
           } catch (followUpError) {
-            console.error(`[${requestId}] Error generating follow-up questions:`, followUpError)
+            // Error generating follow-up questions
           }
           
         } catch (error) {
-          console.error('Stream error:', error)
           
           // Handle specific error types
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -418,10 +394,8 @@ export async function POST(request: Request) {
     return createUIMessageStreamResponse({ stream })
     
   } catch (error) {
-    console.error('Search API error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : ''
-    console.error('Error details:', { errorMessage, errorStack })
     return NextResponse.json(
       { error: 'Search failed', message: errorMessage, details: errorStack },
       { status: 500 }

@@ -164,7 +164,7 @@ export default function FireplexityPage() {
           }
         }
       } catch (error) {
-        console.error('Error checking environment:', error)
+        // Error checking environment
       } finally {
         setIsCheckingEnv(false)
       }
