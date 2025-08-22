@@ -1,12 +1,8 @@
-<div align="center">
-
 # Fireplexity v2
 
 AI search engine with web, news, and images.
 
 <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjBxbWFxamZycWRkMmVhMGFiZnNuZjMxc3lpNHpuamR4OWlwa3F4NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QbfaTCB1OmkRmIQwzJ/giphy.gif" width="100%" alt="Fireplexity Demo" />
-
-</div>
 
 ## Setup
 
