@@ -1,6 +1,6 @@
-# Fireplexity v2
+# Fireplexity v2 with Crawl4ai
 
-AI search engine with web, news, and images.
+AI search engine with web crawling powered by local Crawl4ai service.
 
 <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjBxbWFxamZycWRkMmVhMGFiZnNuZjMxc3lpNHpuamR4OWlwa3F4NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QbfaTCB1OmkRmIQwzJ/giphy.gif" width="100%" alt="Fireplexity Demo" />
 
@@ -20,8 +20,18 @@ cp .env.example .env.local
 
 Add your keys to `.env.local`:
 ```
-FIRECRAWL_API_KEY=fc-your-api-key
-GROQ_API_KEY=gsk_your-groq-api-key
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+## Start Crawl4ai Service
+
+Make sure you have Crawl4ai running locally on port 11234:
+
+```bash
+# Install and run Crawl4ai
+pip install crawl4ai
+crawl4ai --host 0.0.0.0 --port 11234
 ```
 
 ## Run
@@ -38,7 +48,7 @@ Open http://localhost:3000
 
 ## Get API Keys
 
-- [Firecrawl](https://firecrawl.dev)
-- [Groq](https://groq.com)
+- [Crawl4ai](https://github.com/unclecode/crawl4ai) - Local service, no API key needed
+- [OpenAI](https://openai.com) or any OpenAI-compatible API provider
 
 MIT License

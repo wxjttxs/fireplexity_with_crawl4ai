@@ -9,15 +9,6 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
 import { ErrorDisplay } from '@/components/error-display'
 
 interface MessageData {
@@ -39,17 +30,13 @@ export default function FireplexityPage() {
   const [messageData, setMessageData] = useState<Map<number, MessageData>>(new Map())
   const currentMessageIndex = useRef(0)
   const [currentTicker, setCurrentTicker] = useState<string | null>(null)
-  const [firecrawlApiKey, setFirecrawlApiKey] = useState<string>('')
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false)
-  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false)
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true) // Always true for local Crawl4ai service
   const [, setIsCheckingEnv] = useState<boolean>(true)
-  const [pendingQuery, setPendingQuery] = useState<string>('')
   const [input, setInput] = useState<string>('')
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
-      api: '/api/fireplexity/search',
-      body: firecrawlApiKey ? { firecrawlApiKey } : undefined
+      api: '/api/fireplexity/search'
     })
   })
   
@@ -153,15 +140,8 @@ export default function FireplexityPage() {
         const response = await fetch('/api/fireplexity/check-env')
         const data = await response.json()
         
-        if (data.hasFirecrawlKey) {
+        if (data.hasCrawl4aiService) {
           setHasApiKey(true)
-        } else {
-          // Check localStorage for user's API key
-          const storedKey = localStorage.getItem('firecrawl-api-key')
-          if (storedKey) {
-            setFirecrawlApiKey(storedKey)
-            setHasApiKey(true)
-          }
         }
       } catch (error) {
         // Error checking environment
@@ -173,31 +153,11 @@ export default function FireplexityPage() {
     checkApiKey()
   }, [])
 
-  const handleApiKeySubmit = () => {
-    if (firecrawlApiKey.trim()) {
-      localStorage.setItem('firecrawl-api-key', firecrawlApiKey)
-      setHasApiKey(true)
-      setShowApiKeyModal(false)
-      toast.success('API key saved successfully!')
-      
-      // If there's a pending query, submit it
-      if (pendingQuery) {
-        sendMessage({ text: pendingQuery })
-        setPendingQuery('')
-      }
-    }
-  }
+  // No longer needed since we use local Crawl4ai service
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!input.trim()) return
-    
-    // Check if we have an API key
-    if (!hasApiKey) {
-      setPendingQuery(input)
-      setShowApiKeyModal(true)
-      return
-    }
     
     setHasSearched(true)
     // Don't clear data here - wait for new data to arrive
@@ -210,13 +170,6 @@ export default function FireplexityPage() {
   const handleChatSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!input.trim()) return
-    
-    // Check if we have an API key
-    if (!hasApiKey) {
-      setPendingQuery(input)
-      setShowApiKeyModal(true)
-      return
-    }
     
     // Store current data in messageData before new query
     if (messages.length > 0 && sources.length > 0) {
@@ -249,18 +202,14 @@ export default function FireplexityPage() {
       <header className="px-4 sm:px-6 lg:px-8 py-1 mt-2">
         <div className="max-w-[1216px] mx-auto flex items-center justify-between">
           <Link
-            href="https://firecrawl.dev"
+            href="https://github.com/unclecode/crawl4ai"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center"
           >
-            <Image 
-              src="/firecrawl-wordmark.svg" 
-              alt="Firecrawl Logo" 
-              width={90} 
-              height={24}
-              className="h-6 w-auto"
-            />
+            <span className="text-lg font-semibold text-orange-600">
+              Crawl4ai
+            </span>
           </Link>
         </div>
       </header>
@@ -311,43 +260,6 @@ export default function FireplexityPage() {
         </div>
       </div>
 
-      
-      {/* API Key Modal */}
-      <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Firecrawl API Key Required</DialogTitle>
-            <DialogDescription>
-              To use Fireplexity search, you need a Firecrawl API key. Get one for free at{' '}
-              <a 
-                href="https://www.firecrawl.dev" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-orange-600 hover:text-orange-700 underline"
-              >
-                firecrawl.dev
-              </a>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Input
-              placeholder="Enter your Firecrawl API key"
-              value={firecrawlApiKey}
-              onChange={(e) => setFirecrawlApiKey(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleApiKeySubmit()
-                }
-              }}
-              className="h-12"
-            />
-            <Button onClick={handleApiKeySubmit} variant="orange" className="w-full">
-              Save API Key
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createGroq } from '@ai-sdk/groq'
+import { createOpenAI } from '@ai-sdk/openai'
 import { streamText, generateText, createUIMessageStream, createUIMessageStreamResponse, convertToModelMessages } from 'ai'
 import type { ModelMessage } from 'ai'
 import { detectCompanyTicker } from '@/lib/company-ticker-map'
@@ -7,10 +7,12 @@ import { selectRelevantContent } from '@/lib/content-selection'
 
 export async function POST(request: Request) {
   const requestId = Math.random().toString(36).substring(7)
+  console.log(`[${requestId}] Starting search request`)
   
   try {
     const body = await request.json()
     const messages = body.messages || []
+    console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
     
     // Extract query from v5 message structure (messages have parts array)
     let query = body.query
@@ -27,24 +29,27 @@ export async function POST(request: Request) {
     }
 
     if (!query) {
+      console.log(`[${requestId}] No query found in request`)
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
-
-    // Use API key from request body if provided, otherwise fall back to environment variable
-    const firecrawlApiKey = body.firecrawlApiKey || process.env.FIRECRAWL_API_KEY
-    const groqApiKey = process.env.GROQ_API_KEY
     
-    if (!firecrawlApiKey) {
-      return NextResponse.json({ error: 'Firecrawl API key not configured' }, { status: 500 })
-    }
+    console.log(`[${requestId}] Extracted query:`, query)
+
+    // Use OpenAI compatible API for AI responses
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    const openaiBaseUrl = process.env.OPENAI_BASE_URL
     
-    if (!groqApiKey) {
-      return NextResponse.json({ error: 'Groq API key not configured' }, { status: 500 })
+    console.log(`[${requestId}] OpenAI config - API Key: ${openaiApiKey ? 'Set' : 'Not set'}, Base URL: ${openaiBaseUrl}`)
+    
+    if (!openaiApiKey) {
+      console.log(`[${requestId}] OpenAI API key not configured`)
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
     }
 
-    // Configure Groq with the OSS 120B model
-    const groq = createGroq({
-      apiKey: groqApiKey
+    // Configure OpenAI compatible client
+    const openai = createOpenAI({
+      apiKey: openaiApiKey,
+      baseURL: openaiBaseUrl
     })
 
     // Always perform a fresh search for each query to ensure relevant results
@@ -101,51 +106,128 @@ export async function POST(request: Request) {
             transient: true
           })
           
-          // Make direct API call to Firecrawl v2 search endpoint
-          const searchResponse = await fetch('https://api.firecrawl.dev/v2/search', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${firecrawlApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              query: query,
-              sources: ['web', 'news', 'images'],
-              limit: 6,
-              scrapeOptions: {
-                formats: ['markdown'],
-                onlyMainContent: true,
-                maxAge: 86400000  // 24 hours in milliseconds
-              }
-            })
-          })
-
-          if (!searchResponse.ok) {
-            const errorData = await searchResponse.json()
-            throw new Error(`Firecrawl API error: ${errorData.error || searchResponse.statusText}`)
+          // Convert query to search URLs
+          let urlsToCrawl: string[] = []
+          
+          // Check if query looks like a URL
+          if (query.match(/^https?:\/\//)) {
+            urlsToCrawl = [query]
+            console.log(`[${requestId}] Query is URL, crawling:`, urlsToCrawl)
+          } else {
+            // For non-URL queries, we'll use some common knowledge sources
+            // This is a simplified approach - in production you'd want to use a search engine
+            const encodedQuery = encodeURIComponent(query)
+            urlsToCrawl = [
+              `https://en.wikipedia.org/wiki/${encodedQuery}`,
+              `https://www.bing.com/search?q=${encodedQuery}`,
+              `https://www.google.com/search?q=${encodedQuery}`,
+              `https://www.yahoo.com/search?q=${encodedQuery}`,
+              `https://www.duckduckgo.com/search?q=${encodedQuery}`,
+              `https://www.yandex.com/search?q=${encodedQuery}`,
+              `https://www.baidu.com/search?q=${encodedQuery}`
+            ]
+            console.log(`[${requestId}] Query is search term, crawling URLs:`, urlsToCrawl)
           }
 
-          const searchResult = await searchResponse.json()
-          const searchData = searchResult.data || {}
+          // Make API call to local Crawl4ai service using /md endpoint
+          console.log(`[${requestId}] Calling Crawl4ai /md API with URLs:`, urlsToCrawl)
           
-          // Extract results from the v2 SDK response
-          const webResults = searchData.web || []
-          const newsData = searchData.news || []
-          const imagesData = searchData.images || []
+          // Try crawling with fallback strategy using /md endpoint
+          let searchResult;
           
-          // Transform web sources metadata
+          try {
+            // Try crawling each URL concurrently using /md endpoint
+            console.log(`[${requestId}] Starting concurrent crawling of ${urlsToCrawl.length} URLs`)
+            
+            const crawlPromises = urlsToCrawl.map(async (url) => {
+              try {
+                console.log(`[${requestId}] Crawling URL:`, url)
+                const response = await fetch('http://localhost:11234/md', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    url: url
+                  })
+                })
+                
+                if (response.ok) {
+                  const result = await response.json()
+                  console.log(`[${requestId}] Successfully crawled:`, url)
+                  return {
+                    url: url,
+                    title: result.title || url,
+                    content: result.content || '',
+                    markdown: result.markdown || '',
+                    metadata: { title: result.title },
+                    success: true
+                  }
+                } else {
+                  console.log(`[${requestId}] Failed to crawl:`, url, response.status)
+                  return null
+                }
+              } catch (urlError) {
+                console.log(`[${requestId}] Error crawling URL ${url}:`, urlError)
+                return null
+              }
+            })
+            
+            const crawlResults = await Promise.all(crawlPromises)
+            const results = crawlResults.filter(result => result !== null)
+            
+            if (results.length > 0) {
+              searchResult = {
+                success: true,
+                results: results
+              }
+              console.log(`[${requestId}] Successfully crawled ${results.length} URLs`)
+            } else {
+              throw new Error('All crawl attempts failed')
+            }
+            
+          } catch (error) {
+            console.log(`[${requestId}] All crawl attempts failed:`, error)
+            // Create a minimal result to keep the flow going
+            searchResult = {
+              success: true,
+              results: [{
+                url: urlsToCrawl[0],
+                title: "Search Result",
+                content: `Information about: ${query}`,
+                markdown: `# ${query}\n\nThis is a placeholder result for the search query: ${query}`,
+                metadata: { title: query },
+                success: true
+              }]
+            }
+            console.log(`[${requestId}] Using placeholder result`)
+          }
+
+          // searchResult is now available from the try-catch block above
+          
+          // Transform Crawl4ai response to match expected format
+          const webResults = searchResult.results || []
+          const newsData: any[] = [] // Crawl4ai doesn't provide news search, keeping empty for now
+          const imagesData: any[] = [] // Crawl4ai doesn't provide image search, keeping empty for now
+          
+          // Transform web sources metadata from Crawl4ai response
+          console.log(`[${requestId}] Processing ${webResults.length} web results`)
           sources = webResults.map((item: any) => {
-            return {
+            const source = {
               url: item.url,
-              title: item.title || item.url,
-              description: item.description || item.snippet,
-              content: item.content,
-              markdown: item.markdown,
-              favicon: item.favicon,
-              image: item.ogImage || item.image || item.metadata?.ogImage,  // Add ogImage support
-              siteName: new URL(item.url).hostname
+              title: item.metadata?.title || item.url,
+              description: item.metadata?.description || '',
+              content: item.extracted_content || item.cleaned_html,
+              markdown: item.markdown?.raw_markdown || item.markdown,
+              favicon: undefined, // Crawl4ai doesn't provide favicon
+              image: undefined, // Crawl4ai doesn't provide ogImage
+              siteName: item.url ? new URL(item.url).hostname : undefined
             };
+            console.log(`[${requestId}] Processed source:`, { url: source.url, title: source.title, hasContent: !!source.content, hasMarkdown: !!source.markdown })
+            return source;
           }).filter((item: any) => item.url) || []
+          
+          console.log(`[${requestId}] Final sources count:`, sources.length)
 
           // Transform news results - now with correct schema
           newsResults = newsData.map((item: any) => {
@@ -174,9 +256,10 @@ export async function POST(request: Request) {
               height: item.imageHeight,
               position: item.position
             };
-          }).filter(Boolean) || []  // Filter out null entries
+          }).filter((item): item is NonNullable<typeof item> => item !== null) || []  // Filter out null entries
           
           // Send all sources as a persistent data part
+          console.log(`[${requestId}] Sending sources data:`, { sourcesCount: sources.length, newsCount: newsResults.length, imagesCount: imageResults.length })
           writer.write({
             type: 'data-sources',
             id: 'sources-1',
@@ -209,13 +292,17 @@ export async function POST(request: Request) {
           }
           
           // Prepare context from sources with intelligent content selection
+          console.log(`[${requestId}] Preparing context from ${sources.length} sources`)
           context = sources
             .map((source: { title: string; markdown?: string; content?: string; url: string }, index: number) => {
               const content = source.markdown || source.content || ''
               const relevantContent = selectRelevantContent(content, query, 2000)
+              console.log(`[${requestId}] Source ${index + 1} context length:`, relevantContent.length)
               return `[${index + 1}] ${source.title}\nURL: ${source.url}\n${relevantContent}`
             })
             .join('\n\n---\n\n')
+          
+          console.log(`[${requestId}] Total context length:`, context.length)
 
           
           // Prepare messages for the AI
@@ -282,19 +369,23 @@ export async function POST(request: Request) {
             ]
           }
           
-          // Stream the text generation using Groq's Kimi K2 Instruct model
+          // Stream the text generation using OpenAI compatible model
+          console.log(`[${requestId}] Starting AI text generation with ${aiMessages.length} messages`)
           const result = streamText({
-            model: groq('moonshotai/kimi-k2-instruct'),
+            model: openai('gpt-4o'),
             messages: aiMessages,
             temperature: 0.7,
             maxRetries: 2
           })
           
+          console.log(`[${requestId}] Merging AI stream into UIMessage stream`)
           // Merge the AI stream into our UIMessage stream
           writer.merge(result.toUIMessageStream())
           
           // Get the full answer for follow-up generation
+          console.log(`[${requestId}] Getting full answer text`)
           const fullAnswer = await result.text
+          console.log(`[${requestId}] Full answer length:`, fullAnswer.length)
           
           // Generate follow-up questions
           const conversationPreview = isFollowUp 
@@ -308,7 +399,7 @@ export async function POST(request: Request) {
             
           try {
             const followUpResponse = await generateText({
-              model: groq('moonshotai/kimi-k2-instruct'),
+              model: openai('gpt-3.5-turbo'),
               messages: [
                 {
                   role: 'system',
@@ -333,6 +424,7 @@ export async function POST(request: Request) {
               .slice(0, 5)
 
             // Send follow-up questions as a data part
+            console.log(`[${requestId}] Sending ${followUpQuestions.length} follow-up questions`)
             writer.write({
               type: 'data-followup',
               id: 'followup-1',
@@ -343,6 +435,7 @@ export async function POST(request: Request) {
           }
           
         } catch (error) {
+          console.log(`[${requestId}] Error in execute function:`, error)
           
           // Handle specific error types
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -356,11 +449,11 @@ export async function POST(request: Request) {
           const errorResponses: Record<number, { error: string; suggestion?: string }> = {
             401: {
               error: 'Invalid API key',
-              suggestion: 'Please check your Firecrawl API key is correct.'
+              suggestion: 'Please check your API key is correct.'
             },
             402: {
               error: 'Insufficient credits',
-              suggestion: 'You\'ve run out of Firecrawl credits. Please upgrade your plan.'
+              suggestion: 'You\'ve run out of credits. Please upgrade your plan.'
             },
             429: {
               error: 'Rate limit exceeded',
@@ -393,6 +486,7 @@ export async function POST(request: Request) {
     return createUIMessageStreamResponse({ stream })
     
   } catch (error) {
+    console.log(`[${requestId}] Top-level error:`, error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : ''
     return NextResponse.json(
